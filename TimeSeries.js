@@ -87,10 +87,26 @@ function TimeSeries(options) {
 /******************************\
         Public Methods
 \******************************/
+
+/* Walk through all time series in 'self',
+  fn=function(index), 'each' stops if fn returns false */
 TimeSeries.prototype.each = function(fn) {
-  
+  for (var i = 0; i < self.length; i++)
+    if (safeCall(fn, self[i], [i]) === false)
+      return;
 };
 
+TimeSeries.prototype.groupBy = function(field) {
+};
+
+TimeSeries.prototype.sum = function() {
+};
+
+TimeSeries.prototype.count = function() {
+};
+
+TimeSeries.prototype.clone = function(oldTimeSeries) {
+};
 
 /******************************\
        Entry for node.js 
