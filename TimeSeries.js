@@ -37,6 +37,10 @@
       return typeof v === 'function';
     };
 
+    var isString = function(v) {
+      return typeof v === 'string';
+    };
+
     var isArray = function(v) {
       return toString.call(v) === "[object Array]";
     };
@@ -128,10 +132,12 @@
       var series = {
           fields: [],
           data: [],
+          id: '',
         };
       if (!isUndefined(rawData)) {// Do the deepcopy
         series.fields = plainDeepCopy(rawData.fields);
-        if (noData !== false)
+        series.id = defValIfUndefined(rawData.id, '');
+        if (noData !== true)
           series.data = plainDeepCopy(rawData.data);
       }
       setTimeSeriesType(series, T_TIME_SERIES);
@@ -197,20 +203,20 @@
     /* Walk through all time series in 'self',
       fn=function(index)(this=series), 'each' stops if fn returns false */
     self.each = function(fn) {
-      console.log(self);
-      console.log(this);
       for (var i = 0; i < self.length; i++)
         if (safeCall(fn, self[i], [i]) === false)
           return;
     };
 
-    /* groupBy(field1, field2, ...)
-        in which fieldN is either a field name or a function(row)(this=series)
+    /* groupBy(fields)
+        fields is a list in which each is either a 
+        field name or a function(row)(this=series)
         whose return value is a digest string, same string => same group
       Only process TimeSeries[0]
     */
-    self.groupBy = function(field) {
+    self.groupBy = function(fields) {
       var groups = {};
+      
     };
 
     /* sort all series
@@ -221,13 +227,14 @@
     self.sort = function(fields, reversed) {
       var reversed = defValIfUndefined(reversed, false) ? -1 : 1;
       var fields = defValIfUndefined(fields, [F_TIMESTAMP]);
-      var self = (settings.inPlace) ? self : new TimeSeries(self);
+      var _self = (settings.inPlace) ? self : 
+                  new TimeSeries(self, {inPlace: settings.inPlace});
       var basicCmp = function(x, y) {
         if (x === y)
           return 0;
         return (x > y) ? 1 : -1;
       };
-      self.each(function(index) {
+      _self.each(function(index) {
         var series = this;
         var fieldNameToPos = fieldNamePosDict(series);
         series.data.sort(function(x, y) {
@@ -235,42 +242,46 @@
           for (var i = 0, l = fields.length; i < l; i++)
               if ((isFunction(fields[i]) && (f = fields(x, y)) !== 0) ||
                   (f = basicCmp(x[fieldNameToPos[fields[i]]], 
-                                y[fieldsNameToPos[fields[i]]]) !== 0))
+                                y[fieldNameToPos[fields[i]]]) !== 0))
                 return reversed * f;
           return 0;
         });
       });
-      return self;
+      return _self;
     };
 
     /* Do the sum to all fields in all series */
     self.sum = function() {
-      var self = (settings.inPlace) ? self : TimeSeries(self);
+      var _self = (settings.inPlace) ? self : 
+                  new TimeSeries(self, {inPlace: settings.inPlace});
       var seriesList = [];
-      self.each(function(index) {
+      _self.each(function(index) {
         var series = this;
         var fieldNameToPos = fieldNamePosDict(series);
         var s = createSeries(false, series, true);
         seriesList.push(s);
-        for (var i = 0, w = series.fields.length; i < w; i++)
-          s.data[i] = 0;
+
+        s.data[0] = [];
+        for (var j = 0, w = series.fields.length; j < w; j++)
+          s.data[0][j] = 0;
 
         for (var i = 0, l = series.data.length, w = series.fields.length; 
               i < l; i++)
           for (var j = 0; j < w; j++)
-            s.data[j] += series.data[j];
+            s.data[0][j] += series.data[i][j];
           
       });
-      updateTimeSeriesSet(self, seriesList);
-      return self;
+      updateTimeSeriesSet(_self, seriesList);
+      return _self;
     };
 
     /* select certain fields. Each field should be field-name or index */
     self.selectFields = function(fields) {
-      var self = (settings.inPlace) ? self : TimeSeries(self);
-      self.each(function(index) {
+      var _self = (settings.inPlace) ? self : 
+                  new TimeSeries(self, {inPlace: settings.inPlace});
+      _self.each(function(index) {
         var series = this;
-        var fieldsNameToPos = fieldNamePosDict(series);
+        var fieldNameToPos = fieldNamePosDict(series);
         var selFieldsPos = [];
         for (var i = 0, l = fields.length; i < l; i++)
           selFieldsPos.push(isString(fields[i]) ? 
@@ -288,24 +299,32 @@
         // Set fields
         var newFields = [];
         for (var j = 0, w = selFieldsPos.length; j < w; j++)
-          newFields.push(series.fields[j]);
+          newFields.push(series.fields[selFieldsPos[j]]);
         series.fields = newFields;
       });
-      return self;
+      return _self;
     };
 
     /* count of data */
     self.count = function() {
-      var self = (settings.inPlace) ? self : TimeSeries(self);
+      var _self = (settings.inPlace) ? self : 
+                  new TimeSeries(self, {inPlace: settings.inPlace});
       var seriesList = [];
-      self.each(function(index) {
+      _self.each(function(index) {
         var series = this;
-        var newSeries = createSeries(false);
-        newSeries.fields.push(F_COUNT);
+        var newSeries = createSeries(false, series, true);
+        newSeries.fields = [F_COUNT];
         newSeries.data.push(series.data.length);
         seriesList.push(newSeries);
       });
-      updateTimeSeriesSet(self, seriesList);
+      updateTimeSeriesSet(_self, seriesList);
+      return _self;
+    };
+
+    self.inPlace = function(_inPlace) {
+      if (isUndefined(_inPlace))
+        return settings.inPlace;
+      settings.inPlace = _inPlace;
       return self;
     };
 
@@ -315,7 +334,7 @@
 
     var settings = extend({
       dataType: 'time-dictionary',
-      inPlace: true,       // do all operations in place?
+      inPlace: false,       // do all operations in place?
     }, defValIfUndefined(options, {}));
 
     init();
