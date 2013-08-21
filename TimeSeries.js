@@ -9,8 +9,9 @@
  * Version: 0.0
  */
 
-function TimeSeries(obj, options) {
-  return new function(obj, options) {
+(function (){
+  TimeSeries = function(obj, options) {
+  //return new function (obj, options) {
 
     /******************************\
             Private Methods
@@ -126,7 +127,7 @@ function TimeSeries(obj, options) {
         };
       if (!isUndefined(rawData)) {// Do the deepcopy
         series.fields = plainDeepCopy(rawData.fields);
-        if (noData === false)
+        if (noData !== false)
           series.data = plainDeepCopy(rawData.data);
       }
       setTimeSeriesType(series, T_TIME_SERIES);
@@ -143,7 +144,7 @@ function TimeSeries(obj, options) {
     };
 
     var init = function() {
-      setTimeSeriesType(TimeSeries.prototype, T_TIME_SERIES_SET);
+      setTimeSeriesType(self, T_TIME_SERIES_SET);
       self.length = 0;
 
       switch (getTimeSeriesType(obj)) {
@@ -181,38 +182,53 @@ function TimeSeries(obj, options) {
       };
     };
 
+
+    /******************************\
+            Init Methods
+    \******************************/
+
+    var settings = extend({
+      dataType: 'time-dictionary',
+      inPlace: true,       // do all operations in place?
+    }, defValIfUndefined(options, {}));
+
+    init();
+
     /******************************\
             Public Methods
     \******************************/
 
-    TimeSeries.prototype.splice = Array.prototype.splice; // Kidding
+    self.splice = Array.prototype.splice; // Kidding
 
+    return {
     /* Walk through all time series in 'self',
       fn=function(index)(this=series), 'each' stops if fn returns false */
-    TimeSeries.prototype.each = function(fn) {
+    each : function(fn) {
+      console.log(self);
+      console.log(this);
       for (var i = 0; i < self.length; i++)
         if (safeCall(fn, self[i], [i]) === false)
           return;
-    };
+    },
 
     /* groupBy(field1, field2, ...)
         in which fieldN is either a field name or a function(row)(this=series)
         whose return value is a digest string, same string => same group
       Only process TimeSeries[0]
     */
-    TimeSeries.prototype.groupBy = function(field) {
+    groupBy : function(field) {
       var groups = {};
-    };
+    },
 
     /* sort all series
         fields: a list of fields, either field names or function(row1, row2)
           returning -1, 0 or 1,
         reversed: false in default
     */
-    TimeSeries.prototype.sort = function(fields, reversed) {
+    sort : function(fields, reversed) {
       var reversed = defValIfUndefined(reversed, false) ? -1 : 1;
       var fields = defValIfUndefined(fields, [F_TIMESTAMP]);
-      var self = (settings.inPlace) ? self : TimeSeries(self);
+      var self = (settings.inPlace) ? self : new TimeSeries(self);
       var basicCmp = function(x, y) {
         if (x === y)
           return 0;
@@ -224,18 +240,18 @@ function TimeSeries(obj, options) {
         series.data.sort(function(x, y) {
           var f = 0;
           for (var i = 0, l = fields.length; i < l; i++)
-              if ((isFunction(fields[i]) && f = fields(x, y) !== 0) ||
-                  f = basicCmp(x.data[fieldNameToPos[fields[i]]], 
-                                y.data[fieldsNameToPos[fields[i]]] !== 0))
+              if ((isFunction(fields[i]) && (f = fields(x, y)) !== 0) ||
+                  (f = basicCmp(x[fieldNameToPos[fields[i]]], 
+                                y[fieldsNameToPos[fields[i]]]) !== 0))
                 return reversed * f;
           return 0;
         });
       });
       return self;
-    };
+    },
 
     /* Do the sum to all fields in all series */
-    TimeSeries.prototype.sum = function() {
+    sum : function() {
       var self = (settings.inPlace) ? self : TimeSeries(self);
       var seriesList = [];
       self.each(function(index) {
@@ -254,10 +270,10 @@ function TimeSeries(obj, options) {
       });
       updateTimeSeriesSet(self, seriesList);
       return self;
-    };
+    },
 
     /* select certain fields. Each field should be field-name or index */
-    TimeSeries.prototype.selectFields = function(fields) {
+    selectFields : function(fields) {
       var self = (settings.inPlace) ? self : TimeSeries(self);
       self.each(function(index) {
         var series = this;
@@ -283,10 +299,10 @@ function TimeSeries(obj, options) {
         series.fields = newFields;
       });
       return self;
-    };
+    },
 
     /* count of data */
-    TimeSeries.prototype.count = function() {
+    count : function() {
       var self = (settings.inPlace) ? self : TimeSeries(self);
       var seriesList = [];
       self.each(function(index) {
@@ -298,19 +314,16 @@ function TimeSeries(obj, options) {
       });
       updateTimeSeriesSet(self, seriesList);
       return self;
+    }
     };
 
-    var settings = extend({
-      dataType: 'time-dictionary',
-      inPlace: false,       // do all operations in place?
-    }, defValIfUndefined(options, {}));
 
-    init();
-  }(obj, options);
+  //}(obj, options);
 };
+}());
 
 /******************************\
        Entry for node.js 
 \******************************/
-a = TimeSeries();
-console.log(a);
+if (typeof exports !== 'undefined')
+  exports.TimeSeries = TimeSeries;
