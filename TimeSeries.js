@@ -10,6 +10,10 @@
  */
 
 (function (){
+  TS = function(obj, options) {
+    return new TimeSeries(obj, options);
+  };
+
   TimeSeries = function(obj, options) {
   //return new function (obj, options) {
 
@@ -183,16 +187,6 @@
     };
 
 
-    /******************************\
-            Init Methods
-    \******************************/
-
-    var settings = extend({
-      dataType: 'time-dictionary',
-      inPlace: true,       // do all operations in place?
-    }, defValIfUndefined(options, {}));
-
-    init();
 
     /******************************\
             Public Methods
@@ -200,32 +194,31 @@
 
     self.splice = Array.prototype.splice; // Kidding
 
-    return {
     /* Walk through all time series in 'self',
       fn=function(index)(this=series), 'each' stops if fn returns false */
-    each : function(fn) {
+    self.each = function(fn) {
       console.log(self);
       console.log(this);
       for (var i = 0; i < self.length; i++)
         if (safeCall(fn, self[i], [i]) === false)
           return;
-    },
+    };
 
     /* groupBy(field1, field2, ...)
         in which fieldN is either a field name or a function(row)(this=series)
         whose return value is a digest string, same string => same group
       Only process TimeSeries[0]
     */
-    groupBy : function(field) {
+    self.groupBy = function(field) {
       var groups = {};
-    },
+    };
 
     /* sort all series
         fields: a list of fields, either field names or function(row1, row2)
           returning -1, 0 or 1,
         reversed: false in default
     */
-    sort : function(fields, reversed) {
+    self.sort = function(fields, reversed) {
       var reversed = defValIfUndefined(reversed, false) ? -1 : 1;
       var fields = defValIfUndefined(fields, [F_TIMESTAMP]);
       var self = (settings.inPlace) ? self : new TimeSeries(self);
@@ -248,10 +241,10 @@
         });
       });
       return self;
-    },
+    };
 
     /* Do the sum to all fields in all series */
-    sum : function() {
+    self.sum = function() {
       var self = (settings.inPlace) ? self : TimeSeries(self);
       var seriesList = [];
       self.each(function(index) {
@@ -270,10 +263,10 @@
       });
       updateTimeSeriesSet(self, seriesList);
       return self;
-    },
+    };
 
     /* select certain fields. Each field should be field-name or index */
-    selectFields : function(fields) {
+    self.selectFields = function(fields) {
       var self = (settings.inPlace) ? self : TimeSeries(self);
       self.each(function(index) {
         var series = this;
@@ -299,10 +292,10 @@
         series.fields = newFields;
       });
       return self;
-    },
+    };
 
     /* count of data */
-    count : function() {
+    self.count = function() {
       var self = (settings.inPlace) ? self : TimeSeries(self);
       var seriesList = [];
       self.each(function(index) {
@@ -314,12 +307,20 @@
       });
       updateTimeSeriesSet(self, seriesList);
       return self;
-    }
     };
 
+    /******************************\
+            Init Methods
+    \******************************/
 
-  //}(obj, options);
-};
+    var settings = extend({
+      dataType: 'time-dictionary',
+      inPlace: true,       // do all operations in place?
+    }, defValIfUndefined(options, {}));
+
+    init();
+    return self;
+  };
 }());
 
 /******************************\
