@@ -26,6 +26,7 @@
         T_TIME_SERIES     = 'TimeSeries',
         T_OTHER           = false,
         
+        F_ID              = 'id',
         F_COUNT           = 'count',
         F_TIMESTAMP       = 'timestamp';
 
@@ -128,6 +129,8 @@
     };
 
     var updateTimeSeriesSet = function(timeSeriesSet, newSeriesList) {
+      for (var i = 0, l = timeSeriesSet.length; i < l; i++)
+        delete timeSeriesSet[i];
       timeSeriesSet.length = 0;
       for (var i = 0, l = newSeriesList.length; i < l; i++)
         timeSeriesSet[timeSeriesSet.length++] = newSeriesList[i];
@@ -261,6 +264,37 @@
         seriesList.push(groups[digest]);
       });
       updateTimeSeriesSet(_self, seriesList);
+      return _self;
+    };
+
+    /* the inverse operation of 'groupBy', combine all series together 
+        'idFileds': false if no id fields needed, otherwise a list of 
+          field names for 'id'
+    */
+    self.combine = function(newId, idFields) {
+      var idFields = (idFields === false) ? [] : defValIfUndefined(idFields, [F_ID]);
+      var newId = defValIfUndefined(newId, '');
+      var _self = (settings.inPlace) ? self : 
+                  new TimeSeries(self, {inPlace: settings.inPlace});
+      // fields should be the same as the first series
+      var newSeries = createSeries(false, _self[0], true);
+      var idToFields = function(id, fieldCount) {
+        if (fieldCount === 0)
+          return [];
+        else if (fieldCount === 1)
+          return [id];
+        else
+          return id.split("||").slice(0, fieldCount);
+      };
+      newSeries.fields = _self[0].fields.concat(idFields);
+      newSeries.id = newId;
+      _self.each(function(index) {
+        var series = this;
+        for (var i = 0, l = series.data.length; i < l; i++)
+          newSeries.data.push(series.data[i].concat(
+                    idToFields(series.id, idFields.length)));
+      });
+      updateTimeSeriesSet(_self, [newSeries]);
       return _self;
     };
 
