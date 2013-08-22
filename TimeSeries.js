@@ -315,7 +315,7 @@
       var fields = defValIfUndefined(fields, [F_TIMESTAMP]);
       var _self = (settings.inPlace) ? self : 
                   new TimeSeries(self, {inPlace: settings.inPlace});
-      var basicCmp = function(x, y) {
+      var basicCmp = function(x, y) { // compare function for atom types
         if (x === y)
           return 0;
         return (x > y) ? 1 : -1;
@@ -326,11 +326,12 @@
         series.data.sort(function(x, y) {
           var f = 0;
           for (var i = 0, l = fields.length; i < l; i++)
+              // if it's a function, call it; use basicCmp instead
               if ((isFunction(fields[i]) && 
                     (f = fields(rowListToDict(series.fields, x), 
                                 rowListToDict(series.fields, y))) !== 0) ||
                   (f = basicCmp(x[fieldNameToPos[fields[i]]], 
-                                y[fieldNameToPos[fields[i]]]) !== 0))
+                                y[fieldNameToPos[fields[i]]])) !== 0)
                 return reversed * f;
           return 0;
         });
