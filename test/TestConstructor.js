@@ -64,3 +64,10 @@ t3 = t3.filter(function(row) {
 });
 console.log("Result After filter:");
 console.log(t3);
+
+console.log("Before columns: ", t2);
+console.log(t2.columns());
+
+t3 = TS(timeSeries).inPlace(true).groupBy(['age']);
+console.log("Before slice(2): ", t3);
+console.log("After slice(2): ", t3.first(1));

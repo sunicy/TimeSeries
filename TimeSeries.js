@@ -410,11 +410,48 @@
       return _self;
     };
 
+    /* slice each series */
+    self.slice = function(begin, end) {
+      var _self = (settings.inPlace) ? self : 
+                  new TimeSeries(self, {inPlace: settings.inPlace});
+      _self.each(function(index) {
+        var series = this;
+        // IE seems not to support slice(begin, undefined)
+        series.data = isUndefined(end) ? series.data.slice(begin) :
+                                        series.data.slice(begin, end);
+      });
+      return _self;
+    };
+
+    /* first n items for each series */
+    self.first = function(n) {
+      return self.slice(0, n);
+    };
+
+    /* first n items for each series */
+    self.last = function(n) {
+      return self.slice(-n);
+    };
+
     self.inPlace = function(_inPlace) {
       if (isUndefined(_inPlace))
         return settings.inPlace;
       settings.inPlace = _inPlace;
       return self;
+    };
+
+    /* fetch data from the first series, arranged by columns */
+    self.columns = function() {
+      var series = self[0];
+      var cols = {};
+      foreach(series.fields, function(i, index, fields) {
+        cols[i] = cols[fields[i]] = [];
+      });
+      for (var i = 0, l = series.data.length, w = series.fields.length;
+                i < l; i++)
+        for (var j = 0; j < w; j++)
+          cols[j].push(series.data[i][j]);
+      return cols;
     };
 
     /******************************\
