@@ -33,16 +33,21 @@
       return (typeof v === 'undefined');
     };
 
+    var is = function(type, obj) {
+      var clas = Object.prototype.toString.call(obj).slice(8, -1);
+      return obj !== undefined && obj !== null && clas === type;
+    };
+
     var isFunction = function(v) {
-      return typeof v === 'function';
+      return is('Function', v);
     };
 
     var isString = function(v) {
-      return typeof v === 'string';
+      return is('String', v);
     };
 
     var isArray = function(v) {
-      return toString.call(v) === "[object Array]";
+      return is('Array', v);
     };
 
     var isGenericArray = function(v) {
@@ -153,6 +158,16 @@
       return d;
     };
 
+    var rowListToDict = function(fields, rowList) {
+      var dict = {};
+      for (var i = 0, l = fields.length; i < l; i++) {
+        // Act as PHP, both 'field name' and 'field id'
+        dict[fields[i]] = rowList[i];
+        dict[i] = rowList[i];
+      }
+      return dict;
+    };
+
     var init = function() {
       setTimeSeriesType(self, T_TIME_SERIES_SET);
       self.length = 0;
@@ -216,7 +231,78 @@
     */
     self.groupBy = function(fields) {
       var groups = {};
-      
+      var _self = (settings.inPlace) ? self : 
+                  new TimeSeries(self, {inPlace: settings.inPlace});
+      var series = self[0];
+      var fieldNameToPos = fieldNamePosDict(series);
+      for (var i = 0, l = series.data.length, w = fields.length;
+            i < l; i++) {
+        var digest = [];
+        for (var j = 0; j < w; j++) {
+          if (isFunction(fields[j]))
+            digest.push(fields[j].call(series, rowListToDict(series.fields, 
+                                                            series.data[i])));
+          else
+            digest.push(series.data[i][fieldNameToPos[fields[j]]]);
+        }
+        digest = digest.join("||");
+
+        if (!(digest in groups)) {
+          // if this group doesn't exist, create a new series
+          groups[digest] = createSeries(false, series, true);
+          groups[digest].id = digest;
+        }
+        groups[digest].data.push(plainDeepCopy(series.data[i]));
+      }
+
+      // groups => new arrays
+      var seriesList = [];
+      foreach(groups, function(digest, index, groups) {
+        seriesList.push(groups[digest]);
+      });
+      updateTimeSeriesSet(_self, seriesList);
+      return _self;
+    };
+
+    /* add a new column to fields 
+        fnCalc: function(index, row)(this=series), returns a value
+    */
+    self.addField = function(fieldName, fnCalc) {
+      var _self = (settings.inPlace) ? self : 
+                  new TimeSeries(self, {inPlace: settings.inPlace});
+      if (!isFunction(fnCalc))
+        return _self; // Failed!
+
+      _self.each(function(index) {
+        var series = this;
+        var fields = series.fields;
+        var data = series.data;
+        for (var i = 0, l = data.length; i < l; i++)
+          data[i].push(fnCalc.call(series, i, rowListToDict(fields, data[i])));
+        fields.push(fieldName);
+      });
+      return _self;
+    };
+
+    self.filter = function(fnFilter) {
+      var _self = (settings.inPlace) ? self : 
+                  new TimeSeries(self, {inPlace: settings.inPlace});
+      if (!isFunction(fnFilter))
+        return _self; //Failed!
+
+      _self.each(function(index) {
+        var series = this;
+        var fields = series.fields;
+        var data = series.data;
+        for (var i = 0, r = 0, l = data.length; i < l; i++) {
+          if (fnFilter.call(series, rowListToDict(fields, data[i])) !== false) {
+            data[r] = data[i];
+            ++r; // do not delete
+          }
+        }
+        series.data = data.slice(0, r);
+      });
+      return _self;
     };
 
     /* sort all series
@@ -240,7 +326,9 @@
         series.data.sort(function(x, y) {
           var f = 0;
           for (var i = 0, l = fields.length; i < l; i++)
-              if ((isFunction(fields[i]) && (f = fields(x, y)) !== 0) ||
+              if ((isFunction(fields[i]) && 
+                    (f = fields(rowListToDict(series.fields, x), 
+                                rowListToDict(series.fields, y))) !== 0) ||
                   (f = basicCmp(x[fieldNameToPos[fields[i]]], 
                                 y[fieldNameToPos[fields[i]]]) !== 0))
                 return reversed * f;
